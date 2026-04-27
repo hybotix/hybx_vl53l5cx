@@ -3,118 +3,112 @@
  * Hybrid RobotiX — hybx_vl53l5cx
  * Dale Weber <hybotix@hybridrobotix.io>
  *
- * ST ULD platform adaptation — Wire I2C implementation.
- * No SparkFun dependency.
+ * ST ULD platform adaptation — Zephyr native I2C implementation.
  *
  * NOTE: Function names (RdByte, WrByte, RdMulti, WrMulti, SwapBuffer,
  * WaitMs) are MANDATED by the ST Ultra Lite Driver API. They cannot be
  * renamed. These are our implementations of the required platform
- * interface, using Arduino Wire (Wire1) for I2C communication.
+ * interface, using Zephyr's native i2c_transfer() kernel API directly.
  *
- * I2C notes
- * ---------
- * The VL53L5CX uses 16-bit register addresses sent MSB-first.
+ * WHY NOT ARDUINO WIRE?
+ * ---------------------
+ * The ST ULD requires single I2C transactions up to 32,800 bytes write
+ * and 3,100 bytes read (UM2887, Table 2). The Arduino ZephyrI2C Wire
+ * implementation has a 256-byte ring buffer — it cannot handle these
+ * sizes. Chunking into multiple 32-byte transactions with intermediate
+ * STOP conditions causes the VL53L5CX boot poll (register 0x06) to
+ * never complete, hanging vl53l5cx_init() indefinitely.
  *
- * Zephyr's Wire implementation has an internal buffer of 256 bytes.
- * WrMulti chunks large writes (firmware upload) into HYBX_I2C_WR_CHUNK
- * byte pages, re-issuing the 16-bit register address at the start of
- * each chunk. The sensor auto-increments internally so we advance the
- * register address by chunk size on each iteration.
+ * i2c_transfer() uses struct i2c_msg[] with direct buffer pointers —
+ * no ring buffer, no size limit beyond available RAM. Each function
+ * issues a single atomic I2C transaction.
  *
- * RdMulti reads in 32-byte chunks (Wire requestFrom limit on Zephyr).
+ * I2C TRANSACTION DESIGN
+ * ----------------------
+ * WrByte:  [addr_hi, addr_lo, value]           WRITE | STOP
+ * WrMulti: [addr_hi, addr_lo] WRITE +
+ *          [data...N bytes]   WRITE | STOP      — single transaction
+ * RdByte:  [addr_hi, addr_lo] WRITE +
+ *          [value]            RESTART | READ | STOP
+ * RdMulti: [addr_hi, addr_lo] WRITE +
+ *          [data...N bytes]   RESTART | READ | STOP
  *
  * License: MIT (our code) — ST ULD files carry BSD 3-clause.
  */
 
 #include "platform.h"
 #include <Arduino.h>
-
-/* Maximum bytes per WrMulti chunk — must leave room for 2-byte address.
- * Zephyr ZephyrI2C uses a 256-byte ring buffer. The ring buffer feeds
- * a single i2c_write() kernel call. Keep chunks small to stay within
- * the Zephyr I2C driver's internal transfer limits on STM32U5. */
-#define HYBX_I2C_WR_CHUNK   32U
-/* Maximum bytes per RdMulti request */
-#define HYBX_I2C_RD_CHUNK   32U
+#include <zephyr/drivers/i2c.h>
 
 /* -------------------------------------------------------------------------
- * RdByte
+ * RdByte — read one byte from RegisterAddress.
+ *
+ * Issues: START + ADDR + reg_hi + reg_lo + RESTART + ADDR(R) + byte + STOP
  * -------------------------------------------------------------------------*/
 extern "C" uint8_t RdByte(VL53L5CX_Platform *p_platform,
                            uint16_t RegisterAddress, uint8_t *p_value)
 {
-    TwoWire *wire = p_platform->wire;
-    uint8_t  addr = (uint8_t)(p_platform->address);
+    uint8_t reg[2] = {
+        (uint8_t)(RegisterAddress >> 8),
+        (uint8_t)(RegisterAddress & 0xFF)
+    };
 
-    wire->beginTransmission(addr);
-    wire->write((uint8_t)(RegisterAddress >> 8));
-    wire->write((uint8_t)(RegisterAddress & 0xFF));
-    if (wire->endTransmission(false) != 0) {
-        return 1;
-    }
-    if (wire->requestFrom(addr, (uint8_t)1) != 1) {
-        return 1;
-    }
-    *p_value = wire->read();
-    return 0;
+    int ret = i2c_write_read(p_platform->i2c_dev,
+                             (uint16_t)p_platform->address,
+                             reg, sizeof(reg),
+                             p_value, 1U);
+    return (ret == 0) ? 0 : 1;
 }
 
 /* -------------------------------------------------------------------------
- * WrByte
+ * WrByte — write one byte to RegisterAddress.
+ *
+ * Issues: START + ADDR + reg_hi + reg_lo + value + STOP
  * -------------------------------------------------------------------------*/
 extern "C" uint8_t WrByte(VL53L5CX_Platform *p_platform,
                            uint16_t RegisterAddress, uint8_t value)
 {
-    TwoWire *wire = p_platform->wire;
-    uint8_t  addr = (uint8_t)(p_platform->address);
+    uint8_t buf[3] = {
+        (uint8_t)(RegisterAddress >> 8),
+        (uint8_t)(RegisterAddress & 0xFF),
+        value
+    };
 
-    wire->beginTransmission(addr);
-    wire->write((uint8_t)(RegisterAddress >> 8));
-    wire->write((uint8_t)(RegisterAddress & 0xFF));
-    wire->write(value);
-    return (wire->endTransmission() == 0) ? 0 : 1;
+    int ret = i2c_write(p_platform->i2c_dev,
+                        buf, sizeof(buf),
+                        (uint16_t)p_platform->address);
+    return (ret == 0) ? 0 : 1;
 }
 
 /* -------------------------------------------------------------------------
- * RdMulti — read size bytes from RegisterAddress into p_values.
- * Chunked at HYBX_I2C_RD_CHUNK bytes per requestFrom call.
+ * RdMulti — read size bytes from RegisterAddress.
+ *
+ * Uses i2c_write_read() for a single atomic transaction:
+ *   msg[0]: 2-byte register address  (WRITE, no stop)
+ *   msg[1]: size-byte read buffer    (RESTART | READ | STOP)
+ *
+ * No chunking — the full payload is transferred in one transaction.
  * -------------------------------------------------------------------------*/
 extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
                             uint8_t *p_values, uint32_t size)
 {
-    TwoWire *wire = p_platform->wire;
-    uint8_t  addr = (uint8_t)(p_platform->address);
+    uint8_t reg[2] = {
+        (uint8_t)(RegisterAddress >> 8),
+        (uint8_t)(RegisterAddress & 0xFF)
+    };
 
-    /* Set register pointer */
-    wire->beginTransmission(addr);
-    wire->write((uint8_t)(RegisterAddress >> 8));
-    wire->write((uint8_t)(RegisterAddress & 0xFF));
-    if (wire->endTransmission(false) != 0) {
+    int ret = i2c_write_read(p_platform->i2c_dev,
+                             (uint16_t)p_platform->address,
+                             reg, sizeof(reg),
+                             p_values, size);
+
+    if (ret != 0) {
+        /* Fill with 0xFF so ULD poll_for_answer timeout fires correctly */
+        for (uint32_t i = 0; i < size; i++) {
+            p_values[i] = 0xFF;
+        }
         return 1;
-    }
-
-    uint32_t remaining = size;
-    uint32_t offset    = 0;
-
-    while (remaining > 0) {
-        uint8_t chunk = (remaining > HYBX_I2C_RD_CHUNK)
-                        ? (uint8_t)HYBX_I2C_RD_CHUNK
-                        : (uint8_t)remaining;
-        uint8_t got = wire->requestFrom(addr, chunk);
-        if (got != chunk) {
-            /* Fill remaining buffer with 0xFF so the ULD poll_for_answer
-             * timeout branch fires (temp_buffer[2] >= 0x7f triggers MCU_ERROR)
-             * rather than looping forever on I2C failure. */
-            for (uint32_t i = offset; i < size; i++) {
-                p_values[i] = 0xFF;
-            }
-            return 1;
-        }
-        for (uint8_t i = 0; i < got; i++) {
-            p_values[offset++] = wire->read();
-        }
-        remaining -= got;
     }
     return 0;
 }
@@ -122,42 +116,38 @@ extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
 /* -------------------------------------------------------------------------
  * WrMulti — write size bytes from p_values to RegisterAddress.
  *
- * Chunked at HYBX_I2C_WR_CHUNK bytes. Each chunk re-issues the register
- * address (incremented by the number of bytes already written) because the
- * sensor's internal pointer auto-increments and we must stay in sync across
- * Wire transaction boundaries.
+ * Uses i2c_transfer() with two message segments for a single atomic
+ * transaction — no intermediate STOP between address and data:
+ *   msg[0]: 2-byte register address  (WRITE, no stop)
+ *   msg[1]: size-byte data payload   (WRITE | STOP)
+ *
+ * No chunking — the full payload (up to 32,800 bytes per UM2887 Table 2)
+ * is transferred in one transaction. This is required for the VL53L5CX
+ * firmware upload to succeed.
  * -------------------------------------------------------------------------*/
 extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
                             uint8_t *p_values, uint32_t size)
 {
-    TwoWire *wire = p_platform->wire;
-    uint8_t  addr = (uint8_t)(p_platform->address);
+    uint8_t reg[2] = {
+        (uint8_t)(RegisterAddress >> 8),
+        (uint8_t)(RegisterAddress & 0xFF)
+    };
 
-    uint32_t remaining = size;
-    uint32_t offset    = 0;
-    uint16_t reg       = RegisterAddress;
+    struct i2c_msg msgs[2];
 
-    while (remaining > 0) {
-        uint32_t chunk = (remaining > HYBX_I2C_WR_CHUNK)
-                         ? HYBX_I2C_WR_CHUNK
-                         : remaining;
+    msgs[0].buf   = reg;
+    msgs[0].len   = sizeof(reg);
+    msgs[0].flags = I2C_MSG_WRITE;           /* no STOP — data follows */
 
-        wire->beginTransmission(addr);
-        wire->write((uint8_t)(reg >> 8));
-        wire->write((uint8_t)(reg & 0xFF));
-        for (uint32_t i = 0; i < chunk; i++) {
-            wire->write(p_values[offset + i]);
-        }
-        if (wire->endTransmission() != 0) {
-            return 1;
-        }
+    msgs[1].buf   = p_values;
+    msgs[1].len   = size;
+    msgs[1].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
 
-        offset    += chunk;
-        reg       += (uint16_t)chunk;
-        remaining -= chunk;
-    }
-    return 0;
+    int ret = i2c_transfer(p_platform->i2c_dev,
+                           msgs, 2,
+                           (uint16_t)p_platform->address);
+    return (ret == 0) ? 0 : 1;
 }
 
 /* -------------------------------------------------------------------------

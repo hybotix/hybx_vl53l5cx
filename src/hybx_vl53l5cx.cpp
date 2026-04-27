@@ -11,6 +11,7 @@
  */
 
 #include "hybx_vl53l5cx.h"
+#include <zephyr/drivers/i2c.h>
 
 /* -------------------------------------------------------------------------
  * Static definitions — all in BSS, zero heap.
@@ -28,11 +29,11 @@ uint8_t hybx_last_error_step = HYBX_ERR_NONE;
  * -------------------------------------------------------------------------*/
 hybx_vl53l5cx::hybx_vl53l5cx(uint8_t resolution,
                                uint8_t address,
-                               TwoWire &wire)
+                               const struct device *i2c_dev)
     : _resolution(resolution), _initialized(false)
 {
-    _dev.platform.address = (uint16_t)address;
-    _dev.platform.wire    = &wire;
+    _dev.platform.address  = (uint16_t)address;
+    _dev.platform.i2c_dev  = i2c_dev;
 }
 
 /* -------------------------------------------------------------------------
