@@ -95,6 +95,12 @@ extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
                         : (uint8_t)remaining;
         uint8_t got = wire->requestFrom(addr, chunk);
         if (got != chunk) {
+            /* Fill remaining buffer with 0xFF so the ULD poll_for_answer
+             * timeout branch fires (temp_buffer[2] >= 0x7f triggers MCU_ERROR)
+             * rather than looping forever on I2C failure. */
+            for (uint32_t i = offset; i < size; i++) {
+                p_values[i] = 0xFF;
+            }
             return 1;
         }
         for (uint8_t i = 0; i < got; i++) {
