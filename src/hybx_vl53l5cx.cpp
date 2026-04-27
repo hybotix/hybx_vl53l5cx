@@ -124,6 +124,8 @@ bool hybx_vl53l5cx::setResolution(uint8_t resolution)
 void hybx_vl53l5cx::poll()
 {
     if (!_initialized) {
+        /* Not initialized — record as error so sketch can report it */
+        _fail(HYBX_ERR_NOT_INITIALIZED, 0);
         return;
     }
 
