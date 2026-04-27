@@ -29,8 +29,11 @@
 #include "platform.h"
 #include <Arduino.h>
 
-/* Maximum bytes per WrMulti chunk — must leave room for 2-byte address */
-#define HYBX_I2C_WR_CHUNK  250U
+/* Maximum bytes per WrMulti chunk — must leave room for 2-byte address.
+ * Zephyr ZephyrI2C uses a 256-byte ring buffer. The ring buffer feeds
+ * a single i2c_write() kernel call. Keep chunks small to stay within
+ * the Zephyr I2C driver's internal transfer limits on STM32U5. */
+#define HYBX_I2C_WR_CHUNK   32U
 /* Maximum bytes per RdMulti request */
 #define HYBX_I2C_RD_CHUNK   32U
 
