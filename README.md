@@ -1,6 +1,6 @@
 # hybx_vl53l5cx
 Minimal, Heap-Free Library for the ST VL53L5CX 8x8 ToF Distance Sensor
-**Hybrid RobotiX — Dale Weber (N7PKT)**
+**Hybrid RobotiX — Dale Weber <hybotix@hybridrobotix.io>**
 
 ---
 
@@ -138,6 +138,65 @@ profiles:
       - dependency: MsgPack (0.4.2)
       - hybx_vl53l5cx
 default_profile: default
+```
+
+---
+
+## Error Reporting
+
+No silent failures. Every ULD call result is checked and reported.
+
+### Error globals
+
+| Global | Type | Description |
+|---|---|---|
+| `hybx_last_error` | `uint8_t` | ULD status code of the last failure (0 = no error) |
+| `hybx_last_error_step` | `uint8_t` | Which step failed (see step codes below) |
+
+### Error step codes
+
+| Constant | Value | ULD Function |
+|---|---|---|
+| `HYBX_ERR_NONE` | 0 | No error |
+| `HYBX_ERR_INIT` | 1 | `vl53l5cx_init` |
+| `HYBX_ERR_SET_RESOLUTION` | 2 | `vl53l5cx_set_resolution` |
+| `HYBX_ERR_SET_FREQUENCY` | 3 | `vl53l5cx_set_ranging_frequency_hz` |
+| `HYBX_ERR_START_RANGING` | 4 | `vl53l5cx_start_ranging` |
+| `HYBX_ERR_STOP_RANGING` | 5 | `vl53l5cx_stop_ranging` |
+| `HYBX_ERR_CHECK_READY` | 6 | `vl53l5cx_check_data_ready` |
+| `HYBX_ERR_GET_DATA` | 7 | `vl53l5cx_get_ranging_data` |
+| `HYBX_ERR_BAD_RESOLUTION` | 8 | Invalid resolution value passed to `setResolution()` |
+| `HYBX_ERR_NOT_INITIALIZED` | 9 | Method called before `begin()` succeeded |
+
+### Failure coverage
+
+| Layer | Failure Point | Handling |
+|---|---|---|
+| `platform.cpp` | Every I2C endTransmission/requestFrom | Returns 1 → ULD → `_fail()` |
+| `begin()` | init, set_resolution, set_frequency, start_ranging | `_fail()` with step + ULD code |
+| `setResolution()` | not_init, bad_res, stop, set_res, set_freq, start | `_fail()` with step + ULD code |
+| `poll()` | not_initialized, check_data_ready | `_fail()` with step + ULD code |
+| `_readFrame()` | get_ranging_data | `_fail()` with step + ULD code |
+
+Error globals are cleared automatically when a frame is successfully read.
+
+### Exposing errors via Bridge
+
+```cpp
+String get_sensor_status() {
+    if (initFailed) {
+        return "init_failed:" + String(hybx_last_error_step) +
+               ":" + String(hybx_last_error);
+    }
+    if (hybx_sensor_ready) {
+        if (hybx_last_error_step != 0) {
+            return "error:" + String(hybx_last_error_step) +
+                   ":" + String(hybx_last_error);
+        }
+        return "ready";
+    }
+    return "initializing";
+}
 ```
 
 ---
