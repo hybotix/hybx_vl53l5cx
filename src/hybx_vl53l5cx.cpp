@@ -1,9 +1,11 @@
 /*
  * hybx_vl53l5cx.cpp
  * Hybrid RobotiX — hybx_vl53l5cx
- * Dale Weber (N7PKT)
+ * Dale Weber <hybotix@hybridrobotix.io>
  *
- * See hybx_vl53l5cx.h for full design notes.
+ * No silent failures. Every ULD call result is checked.
+ * Failures are stored in hybx_last_error and hybx_last_error_step
+ * for the sketch to report via Bridge functions.
  *
  * License: MIT (our code) — ST ULD files carry BSD 3-clause.
  */
@@ -13,14 +15,13 @@
 /* -------------------------------------------------------------------------
  * Static definitions — all in BSS, zero heap.
  * -------------------------------------------------------------------------*/
-
-/* ST ULD configuration struct (~5375 bytes including temp_buffer). */
 VL53L5CX_Configuration hybx_vl53l5cx::_dev;
 
-/* Public result globals. */
 int16_t hybx_distance_mm[64];
 uint8_t hybx_target_status[64];
-bool    hybx_sensor_ready = false;
+bool    hybx_sensor_ready    = false;
+uint8_t hybx_last_error      = HYBX_ERR_NONE;
+uint8_t hybx_last_error_step = HYBX_ERR_NONE;
 
 /* -------------------------------------------------------------------------
  * Constructor
@@ -35,33 +36,41 @@ hybx_vl53l5cx::hybx_vl53l5cx(uint8_t resolution,
 }
 
 /* -------------------------------------------------------------------------
- * begin() — firmware upload and start ranging.
+ * _fail() — record error and return false
+ * -------------------------------------------------------------------------*/
+bool hybx_vl53l5cx::_fail(uint8_t step, uint8_t uld_status)
+{
+    hybx_last_error_step = step;
+    hybx_last_error      = uld_status;
+    return false;
+}
+
+/* -------------------------------------------------------------------------
+ * begin()
  * -------------------------------------------------------------------------*/
 bool hybx_vl53l5cx::begin()
 {
     uint8_t status;
 
-    /* Upload sensor firmware — this is the slow step (~10 s over I2C). */
     status = vl53l5cx_init(&_dev);
     if (status != VL53L5CX_STATUS_OK) {
-        return false;
+        return _fail(HYBX_ERR_INIT, status);
     }
 
     status = vl53l5cx_set_resolution(&_dev, _resolution);
     if (status != VL53L5CX_STATUS_OK) {
-        return false;
+        return _fail(HYBX_ERR_SET_RESOLUTION, status);
     }
 
-    /* 8x8 max 15 Hz, 4x4 max 60 Hz — use 15 and 30 as sensible defaults. */
     uint8_t freq = (_resolution == VL53L5CX_RESOLUTION_8X8) ? 15 : 30;
     status = vl53l5cx_set_ranging_frequency_hz(&_dev, freq);
     if (status != VL53L5CX_STATUS_OK) {
-        return false;
+        return _fail(HYBX_ERR_SET_FREQUENCY, status);
     }
 
     status = vl53l5cx_start_ranging(&_dev);
     if (status != VL53L5CX_STATUS_OK) {
-        return false;
+        return _fail(HYBX_ERR_START_RANGING, status);
     }
 
     _initialized = true;
@@ -69,45 +78,48 @@ bool hybx_vl53l5cx::begin()
 }
 
 /* -------------------------------------------------------------------------
- * setResolution() — stop, reconfigure, restart.
+ * setResolution()
  * -------------------------------------------------------------------------*/
 bool hybx_vl53l5cx::setResolution(uint8_t resolution)
 {
     if (!_initialized) {
-        return false;
+        return _fail(HYBX_ERR_NOT_INITIALIZED, 0);
     }
     if (resolution != VL53L5CX_RESOLUTION_4X4 &&
         resolution != VL53L5CX_RESOLUTION_8X8) {
-        return false;
+        return _fail(HYBX_ERR_BAD_RESOLUTION, resolution);
     }
 
     uint8_t status;
 
     status = vl53l5cx_stop_ranging(&_dev);
     if (status != VL53L5CX_STATUS_OK) {
-        return false;
+        return _fail(HYBX_ERR_STOP_RANGING, status);
     }
 
     _resolution = resolution;
 
     status = vl53l5cx_set_resolution(&_dev, _resolution);
     if (status != VL53L5CX_STATUS_OK) {
-        return false;
+        return _fail(HYBX_ERR_SET_RESOLUTION, status);
     }
 
     uint8_t freq = (_resolution == VL53L5CX_RESOLUTION_8X8) ? 15 : 30;
-    vl53l5cx_set_ranging_frequency_hz(&_dev, freq);
+    status = vl53l5cx_set_ranging_frequency_hz(&_dev, freq);
+    if (status != VL53L5CX_STATUS_OK) {
+        return _fail(HYBX_ERR_SET_FREQUENCY, status);
+    }
 
     status = vl53l5cx_start_ranging(&_dev);
     if (status != VL53L5CX_STATUS_OK) {
-        return false;
+        return _fail(HYBX_ERR_START_RANGING, status);
     }
 
     return true;
 }
 
 /* -------------------------------------------------------------------------
- * poll() — non-blocking, call from loop().
+ * poll()
  * -------------------------------------------------------------------------*/
 void hybx_vl53l5cx::poll()
 {
@@ -116,18 +128,19 @@ void hybx_vl53l5cx::poll()
     }
 
     uint8_t isReady = 0;
-    vl53l5cx_check_data_ready(&_dev, &isReady);
+    uint8_t status  = vl53l5cx_check_data_ready(&_dev, &isReady);
+    if (status != VL53L5CX_STATUS_OK) {
+        _fail(HYBX_ERR_CHECK_READY, status);
+        return;
+    }
+
     if (isReady) {
         _readFrame();
     }
 }
 
 /* -------------------------------------------------------------------------
- * _readFrame() — read one frame into static result globals.
- *
- * VL53L5CX_ResultsData is declared static here to keep it out of both
- * the heap and the stack. _readFrame() is only ever called from poll()
- * which is not reentrant, so static is safe.
+ * _readFrame()
  * -------------------------------------------------------------------------*/
 void hybx_vl53l5cx::_readFrame()
 {
@@ -135,14 +148,18 @@ void hybx_vl53l5cx::_readFrame()
 
     uint8_t status = vl53l5cx_get_ranging_data(&_dev, &results);
     if (status != VL53L5CX_STATUS_OK) {
+        _fail(HYBX_ERR_GET_DATA, status);
         return;
     }
 
-    uint8_t zones = _resolution;   /* 16 or 64 */
+    uint8_t zones = _resolution;
     for (uint8_t i = 0; i < zones; i++) {
-        hybx_distance_mm[i]  = results.distance_mm[i];
+        hybx_distance_mm[i]   = results.distance_mm[i];
         hybx_target_status[i] = results.target_status[i];
     }
 
-    hybx_sensor_ready = true;
+    /* Clear any previous error once a frame is successfully read */
+    hybx_last_error      = HYBX_ERR_NONE;
+    hybx_last_error_step = HYBX_ERR_NONE;
+    hybx_sensor_ready    = true;
 }
