@@ -82,13 +82,18 @@ static uint8_t _vl53l5cx_poll_for_answer(VL53L5CX_Configuration *p_dev, uint8_t 
 
 		if (timeout >= (uint8_t)200) /* 2s timeout */
 		{
-			status |= p_dev->temp_buffer[2];
+			/* HybX fix: exit the loop on timeout by forcing status nonzero
+			 * and breaking. The original code used temp_buffer[2] which is
+			 * out of bounds when size=1 and does not break the while loop. */
+			status |= VL53L5CX_MCU_ERROR;
+			break;
 		}
 		else
 		{
 			if ((size >= (uint8_t)4) && (p_dev->temp_buffer[2] >= (uint8_t)0x7f))
 			{
 				status |= VL53L5CX_MCU_ERROR;
+				break;
 			}
 			else
 			{
