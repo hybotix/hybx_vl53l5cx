@@ -55,10 +55,12 @@ typedef struct {
 #define VL53L5CX_DISABLE_MOTION_INDICATOR
 
 /* -------------------------------------------------------------------------
- * Mandatory platform functions — implemented in platform.cpp.
+ * Mandatory ST ULD platform functions — implemented in platform.cpp.
  *
- * The ST ULD calls these by the short names RdByte, WrByte, etc.
- * They must have C linkage so the C-compiled ULD can call them from C++.
+ * These function names are MANDATED by the ST Ultra Lite Driver API.
+ * They cannot be renamed — vl53l5cx_api.cpp calls them by these exact
+ * names. They must have C linkage so the C-compiled ULD can call them
+ * from C++. Our implementations use Arduino Wire (Wire1) for I2C.
  * -------------------------------------------------------------------------*/
 #ifdef __cplusplus
 extern "C" {

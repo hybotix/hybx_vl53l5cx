@@ -1,10 +1,15 @@
 /*
  * platform.cpp
  * Hybrid RobotiX — hybx_vl53l5cx
- * Dale Weber (N7PKT)
+ * Dale Weber <hybotix@hybridrobotix.io>
  *
  * ST ULD platform adaptation — Wire I2C implementation.
- * No SparkFun dependency whatsoever.
+ * No SparkFun dependency.
+ *
+ * NOTE: Function names (RdByte, WrByte, RdMulti, WrMulti, SwapBuffer,
+ * WaitMs) are MANDATED by the ST Ultra Lite Driver API. They cannot be
+ * renamed. These are our implementations of the required platform
+ * interface, using Arduino Wire (Wire1) for I2C communication.
  *
  * I2C notes
  * ---------
