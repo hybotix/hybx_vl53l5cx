@@ -39,6 +39,7 @@
 #include "platform.h"
 #include <Arduino.h>
 #include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/i2c/i2c_ll_stm32.h>
 
 /* -------------------------------------------------------------------------
  * RdByte — read one byte from RegisterAddress.
@@ -116,14 +117,17 @@ extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
 /* -------------------------------------------------------------------------
  * WrMulti — write size bytes from p_values to RegisterAddress.
  *
- * Uses i2c_transfer() with two message segments for a single atomic
- * transaction — no intermediate STOP between address and data:
+ * Uses i2c_transfer() with two message segments and the STM32-specific
+ * I2C_MSG_STM32_USE_RELOAD_MODE flag:
  *   msg[0]: 2-byte register address  (WRITE, no stop)
- *   msg[1]: size-byte data payload   (WRITE | STOP)
+ *   msg[1]: size-byte data payload   (WRITE | STOP | RELOAD_MODE)
  *
- * No chunking — the full payload (up to 32,800 bytes per UM2887 Table 2)
- * is transferred in one transaction. This is required for the VL53L5CX
- * firmware upload to succeed.
+ * RELOAD_MODE tells the STM32U5 I2C V2 driver to use the hardware RELOAD
+ * mechanism instead of generating new START conditions at 255-byte
+ * boundaries. This enables single continuous transactions up to 32,800
+ * bytes as required by the VL53L5CX firmware upload (UM2887 Table 2).
+ *
+ * No chunking — the full payload is transferred in one atomic transaction.
  * -------------------------------------------------------------------------*/
 extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
@@ -142,7 +146,12 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
 
     msgs[1].buf   = p_values;
     msgs[1].len   = size;
-    msgs[1].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
+    /* I2C_MSG_STM32_USE_RELOAD_MODE: instructs the STM32U5 I2C V2 driver
+     * to use the hardware RELOAD mechanism for the full payload. Without
+     * this flag, the driver generates a new START at every 255-byte boundary,
+     * breaking the VL53L5CX firmware upload which requires a single
+     * continuous I2C transaction (up to 32,800 bytes per UM2887 Table 2). */
+    msgs[1].flags = I2C_MSG_WRITE | I2C_MSG_STOP | I2C_MSG_STM32_USE_RELOAD_MODE;
 
     int ret = i2c_transfer(p_platform->i2c_dev,
                            msgs, 2,
