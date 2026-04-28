@@ -80,7 +80,7 @@ static uint8_t _vl53l5cx_poll_for_answer(VL53L5CX_Configuration *p_dev, uint8_t 
 		status |= RdMulti(&(p_dev->platform), address, p_dev->temp_buffer, size);
 		status |= WaitMs(&(p_dev->platform), 10);
 
-		if (timeout >= (uint16_t)1000) /* 10s timeout */
+		if (timeout >= (uint16_t)200) /* 2s timeout */
 		{
 			/* HybX fix: exit the loop on timeout by forcing status nonzero
 			 * and breaking. The original code used temp_buffer[2] which is

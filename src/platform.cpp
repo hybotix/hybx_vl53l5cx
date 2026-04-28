@@ -165,14 +165,16 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
             chunk = HYBX_I2C_WR_CHUNK;
         }
 
-        /* Send register address with EVERY chunk. The VL53L5CX uses a
-         * 16-bit address per transaction — there is no auto-increment
-         * across separate I2C transactions. The address advances by the
-         * chunk size each iteration. */
-        uint16_t chunkAddr = (uint16_t)(RegisterAddress + offset);
+        /* The VL53L5CX page memory (selected via WrByte(0x7fff, page))
+         * is a streaming buffer. Writes always begin at RegisterAddress
+         * (typically 0x0000). The address does NOT increment across
+         * separate I2C transactions — the sensor advances its internal
+         * write pointer sequentially as data arrives. Each chunk must
+         * present the SAME base address (RegisterAddress), not an
+         * incrementing offset. */
         uint8_t reg[2] = {
-            (uint8_t)(chunkAddr >> 8),
-            (uint8_t)(chunkAddr & 0xFF)
+            (uint8_t)(RegisterAddress >> 8),
+            (uint8_t)(RegisterAddress & 0xFF)
         };
 
         struct i2c_msg msgs[2];
