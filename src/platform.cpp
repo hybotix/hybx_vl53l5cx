@@ -129,46 +129,84 @@ extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
 /* -------------------------------------------------------------------------
  * WrMulti — write size bytes from p_values to RegisterAddress.
  *
- * Uses i2c_transfer() with two message segments and the STM32-specific
- * I2C_MSG_STM32_USE_RELOAD_MODE flag:
- *   msg[0]: 2-byte register address  (WRITE, no stop)
- *   msg[1]: size-byte data payload   (WRITE | STOP | RELOAD_MODE)
+ * The STM32U5 I2C driver has a kernel-level transfer timeout of 500ms
+ * (CONFIG_I2C_STM32_TRANSFER_TIMEOUT_MSEC). At 400kHz, a single 32KB
+ * transfer takes ~0.7 seconds, exceeding this limit and causing the
+ * kernel semaphore to timeout, aborting the transfer.
  *
- * RELOAD_MODE tells the STM32U5 I2C V2 driver to use the hardware RELOAD
- * mechanism instead of generating new START conditions at 255-byte
- * boundaries. This enables single continuous transactions up to 32,800
- * bytes as required by the VL53L5CX firmware upload (UM2887 Table 2).
+ * Solution: chunk at HYBX_I2C_WR_CHUNK bytes per i2c_transfer() call.
+ * At 400kHz, 16KB takes ~0.37 seconds — safely within 500ms.
  *
- * No chunking — the full payload is transferred in one atomic transaction.
+ * The VL53L5CX accepts chunked writes because the register address
+ * auto-increments within each page. The ULD sets the page register
+ * (0x7fff) before each WrMulti call, so we only send the 2-byte
+ * register address on the FIRST chunk. Subsequent chunks start at
+ * the address where the previous chunk ended.
+ *
+ * Each chunk uses i2c_transfer() with two message segments:
+ *   msg[0]: 2-byte register address (WRITE, no STOP) — first chunk only
+ *   msg[1]: chunk data              (WRITE | STOP)
+ *
+ * I2C_MSG_STM32_USE_RELOAD_MODE on msg[1] enables hardware RELOAD for
+ * the internal 255-byte boundaries within each chunk, keeping each
+ * chunk as a single continuous I2C transaction on the wire.
  * -------------------------------------------------------------------------*/
+
+/* Maximum bytes per WrMulti chunk — must complete within 500ms at 400kHz.
+ * 16384 bytes × 9 bits / 400000 bps ≈ 0.37s — well within 500ms limit. */
+#define HYBX_I2C_WR_CHUNK  16384U
+
 extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
                             uint8_t *p_values, uint32_t size)
 {
-    uint8_t reg[2] = {
-        (uint8_t)(RegisterAddress >> 8),
-        (uint8_t)(RegisterAddress & 0xFF)
-    };
+    uint32_t offset = 0;
+    bool     first  = true;
 
-    struct i2c_msg msgs[2];
+    while (offset < size) {
+        uint32_t chunk = size - offset;
+        if (chunk > HYBX_I2C_WR_CHUNK) {
+            chunk = HYBX_I2C_WR_CHUNK;
+        }
 
-    msgs[0].buf   = reg;
-    msgs[0].len   = sizeof(reg);
-    msgs[0].flags = I2C_MSG_WRITE;           /* no STOP — data follows */
+        uint8_t reg[2] = {
+            (uint8_t)(RegisterAddress >> 8),
+            (uint8_t)(RegisterAddress & 0xFF)
+        };
 
-    msgs[1].buf   = p_values;
-    msgs[1].len   = size;
-    /* I2C_MSG_STM32_USE_RELOAD_MODE: instructs the STM32U5 I2C V2 driver
-     * to use the hardware RELOAD mechanism for the full payload. Without
-     * this flag, the driver generates a new START at every 255-byte boundary,
-     * breaking the VL53L5CX firmware upload which requires a single
-     * continuous I2C transaction (up to 32,800 bytes per UM2887 Table 2). */
-    msgs[1].flags = I2C_MSG_WRITE | I2C_MSG_STOP | I2C_MSG_STM32_USE_RELOAD_MODE;
+        struct i2c_msg msgs[2];
+        uint8_t num_msgs;
 
-    int ret = i2c_transfer(p_platform->i2c_dev,
-                           msgs, 2,
-                           (uint16_t)p_platform->address);
-    return (ret == 0) ? 0 : 1;
+        if (first) {
+            /* First chunk: send register address + data */
+            msgs[0].buf   = reg;
+            msgs[0].len   = sizeof(reg);
+            msgs[0].flags = I2C_MSG_WRITE;
+            msgs[1].buf   = p_values + offset;
+            msgs[1].len   = chunk;
+            msgs[1].flags = I2C_MSG_WRITE | I2C_MSG_STOP
+                            | I2C_MSG_STM32_USE_RELOAD_MODE;
+            num_msgs = 2;
+            first = false;
+        } else {
+            /* Subsequent chunks: data only, address auto-incremented */
+            msgs[0].buf   = p_values + offset;
+            msgs[0].len   = chunk;
+            msgs[0].flags = I2C_MSG_WRITE | I2C_MSG_STOP
+                            | I2C_MSG_STM32_USE_RELOAD_MODE;
+            num_msgs = 1;
+        }
+
+        int ret = i2c_transfer(p_platform->i2c_dev,
+                               msgs, num_msgs,
+                               (uint16_t)p_platform->address);
+        if (ret != 0) {
+            return 1;
+        }
+
+        offset += chunk;
+    }
+    return 0;
 }
 
 /* -------------------------------------------------------------------------
