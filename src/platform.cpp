@@ -39,7 +39,19 @@
 #include "platform.h"
 #include <Arduino.h>
 #include <zephyr/drivers/i2c.h>
-#include <zephyr/drivers/i2c/i2c_ll_stm32.h>
+/* I2C_MSG_STM32_USE_RELOAD_MODE is a private STM32 I2C V2 driver flag
+ * defined in <zephyr/drivers/i2c/i2c_ll_stm32.h> (llext-edk, not in
+ * the standard sketch include path). We define the value directly —
+ * it is BIT(7) = 0x80, verified against the installed header at:
+ * ~/.arduino15/packages/arduino/hardware/zephyr/0.54.1/variants/
+ *   arduino_uno_q_stm32u585xx/llext-edk/include/zephyr/drivers/i2c/
+ *   i2c_ll_stm32.h
+ * This flag instructs the STM32 I2C V2 driver to use hardware RELOAD
+ * mode for transfers > 255 bytes instead of generating new START
+ * conditions at each 255-byte boundary. */
+#ifndef I2C_MSG_STM32_USE_RELOAD_MODE
+#define I2C_MSG_STM32_USE_RELOAD_MODE   (1U << 7U)
+#endif
 
 /* -------------------------------------------------------------------------
  * RdByte — read one byte from RegisterAddress.
