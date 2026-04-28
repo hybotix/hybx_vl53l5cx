@@ -13,7 +13,35 @@ It bundles the ST Ultra Lite Driver (ULD) source directly under its original BSD
 3-clause license, and replaces the SparkFun platform layer with a clean Wire
 implementation — **no SparkFun library dependency**.
 
-### Why this exists
+### ⚠️ v1.x Platform Limitation — Arduino UNO Q
+
+`hybx_vl53l5cx` **cannot initialize the VL53L5CX on the Arduino UNO Q under
+the HybX Development System v1.x.** This is a known platform limitation that
+will be resolved in v2.0 (HybX Build System).
+
+**Root cause:** The VL53L5CX firmware upload requires a single continuous I2C
+transaction of up to 32,800 bytes (ST UM2887 Table 2). The Zephyr STM32 I2C
+driver as shipped in the Arduino Zephyr board package enforces a 500ms kernel
+timeout (`CONFIG_I2C_STM32_TRANSFER_TIMEOUT_MSEC`) per `i2c_transfer()` call.
+At 400kHz, a 32KB transfer takes ~0.7 seconds — exceeding this limit. The
+transfer is aborted before the firmware upload completes.
+
+**Attempted solutions rejected:**
+- Chunking the upload: fails because the VL53L5CX page memory resets on each
+  new I2C START condition — only the last chunk survives
+- Board config override: `CONFIG_I2C_STM32_TRANSFER_TIMEOUT_MSEC=5000` or
+  `CONFIG_I2C_STM32_V2_DMA=y` are overwritten on Arduino package updates
+
+**v2.0 resolution:** The HybX Build System owns the board Kconfig. DMA will be
+enabled for i2c4 (`CONFIG_I2C_STM32_V2_DMA=y`) — the correct, permanent fix.
+
+The library architecture, platform layer, ULD integration, and Bridge interface
+are all correct and complete. Only the I2C transfer size constraint blocks
+initialization on v1.x.
+
+---
+
+## Why this exists
 
 The Arduino RouterBridge on Zephyr RTOS is incompatible with `operator new`. Any heap
 allocation at or after `Bridge.begin()` / `Bridge.provide()` corrupts the Bridge's
