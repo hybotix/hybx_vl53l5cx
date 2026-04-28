@@ -152,7 +152,7 @@ extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
 
 /* Maximum bytes per WrMulti chunk — must complete within 500ms at 400kHz.
  * 16384 bytes × 9 bits / 400000 bps ≈ 0.37s — well within 500ms limit. */
-#define HYBX_I2C_WR_CHUNK  16384U
+#define HYBX_I2C_WR_CHUNK  4096U
 
 extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
