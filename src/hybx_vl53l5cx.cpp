@@ -79,8 +79,7 @@ bool hybx_vl53l5cx::begin()
      * any further commands (e.g. set_resolution) are accepted. */
     delay(500);
 
-    _initialized      = true;
-    hybx_sensor_ready = true;
+    _initialized = true;
     return true;
 }
 
