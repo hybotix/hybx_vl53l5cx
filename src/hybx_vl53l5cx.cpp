@@ -74,7 +74,11 @@ bool hybx_vl53l5cx::begin()
         return _fail(HYBX_ERR_START_RANGING, status);
     }
 
-    _initialized     = true;
+    /* Allow sensor MCU to stabilize after starting ranging before
+     * any further commands (e.g. set_resolution) are accepted. */
+    delay(500);
+
+    _initialized      = true;
     hybx_sensor_ready = true;
     return true;
 }
