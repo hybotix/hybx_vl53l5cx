@@ -136,13 +136,13 @@ extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
  * 4096 bytes takes ~0.09s — well within the limit.
  * -------------------------------------------------------------------------*/
 
-#define HYBX_I2C_WR_CHUNK  4096U
+#define HYBX_I2C_WR_CHUNK  255U
 
 extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
                             uint8_t *p_values, uint32_t size)
 {
-    bool streaming = (RegisterAddress == 0 && size > HYBX_I2C_WR_CHUNK);
+    bool streaming = (RegisterAddress == 0 && size > 1024U);
     uint32_t offset = 0;
 
     while (offset < size) {
