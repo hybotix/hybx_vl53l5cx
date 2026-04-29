@@ -28,13 +28,10 @@ uint8_t hybx_init_step       = 0;
 /* -------------------------------------------------------------------------
  * Constructor
  * -------------------------------------------------------------------------*/
-hybx_vl53l5cx::hybx_vl53l5cx(uint8_t resolution,
-                               uint8_t address,
-                               const struct device *i2c_dev)
+hybx_vl53l5cx::hybx_vl53l5cx(uint8_t resolution, uint8_t address)
     : _resolution(resolution), _initialized(false)
 {
-    _dev.platform.address  = (uint16_t)address;
-    _dev.platform.i2c_dev  = i2c_dev;
+    _dev.platform.address = (uint16_t)address;
 }
 
 /* -------------------------------------------------------------------------

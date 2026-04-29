@@ -24,9 +24,9 @@
  *
  * I2C
  * ---
- * Default: i2c4 (UNO Q QWIIC bus / Wire1), address 0x29.
- * Uses Zephyr native i2c_transfer() — no Wire.begin() needed.
- * The i2c4 device is enabled and configured at 400kHz in the DTS overlay.
+ * Uses Arduino Wire1 (QWIIC bus) — no Wire1.begin() needed or allowed.
+ * Wire1.begin() hangs the MCU when called after Bridge.begin().
+ * Default address 0x29.
  *
  * License: MIT (our code) — ST ULD files carry BSD 3-clause.
  */
@@ -34,7 +34,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <zephyr/drivers/i2c.h>
 #include "platform.h"
 #include "uld/vl53l5cx_api.h"
 
@@ -71,14 +70,10 @@ public:
      * Constructor.
      * resolution : 16 (4x4) or 64 (8x8). Default 64.
      * address    : 7-bit I2C address. Default 0x29.
-     * i2c_dev    : Zephyr I2C device pointer.
-     *              Default: DEVICE_DT_GET(DT_NODELABEL(i2c4)) (Wire1/QWIIC on UNO Q).
-     *              Use Zephyr native API — bypasses Arduino Wire ring buffer
-     *              limit which cannot handle the 32KB firmware upload.
+     * Wire1 is used automatically — never call Wire1.begin().
      */
     hybx_vl53l5cx(uint8_t resolution = 64,
-                  uint8_t address    = 0x29,
-                  const struct device *i2c_dev = DEVICE_DT_GET(DT_NODELABEL(i2c4)));
+                  uint8_t address    = 0x29);
 
     /*
      * begin() — upload firmware and start ranging.
