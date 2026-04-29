@@ -65,6 +65,10 @@
 #include "vl53l5cx_buffers.h"
 #include <Arduino.h>
 
+/* Diagnostic step counter — incremented before each poll call so the
+ * sketch can report exactly which checkpoint vl53l5cx_init reached. */
+extern uint8_t hybx_init_step;
+
 /**
  * @brief Inner function, not available outside this file. This function is used
  * to wait for an answer from VL53L5CX sensor.
@@ -74,6 +78,8 @@ static uint8_t _vl53l5cx_poll_for_answer(VL53L5CX_Configuration *p_dev, uint8_t 
 {
 	uint8_t  status  = VL53L5CX_STATUS_OK;
 	uint16_t timeout = 0;
+
+	hybx_init_step++; /* diagnostic: record which poll checkpoint we entered */
 
 	do
 	{

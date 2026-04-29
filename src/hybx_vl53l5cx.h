@@ -60,6 +60,7 @@ extern uint8_t  hybx_target_status[64];
 extern bool     hybx_sensor_ready;
 extern uint8_t  hybx_last_error;       /* ULD status code of last failure */
 extern uint8_t  hybx_last_error_step;  /* HYBX_ERR_* step that failed */
+extern uint8_t  hybx_init_step;        /* diagnostic: poll checkpoint reached in vl53l5cx_init */
 
 /* -------------------------------------------------------------------------
  * hybx_vl53l5cx — thin, heap-free driver class
