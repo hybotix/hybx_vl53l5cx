@@ -74,7 +74,8 @@ bool hybx_vl53l5cx::begin()
         return _fail(HYBX_ERR_START_RANGING, status);
     }
 
-    _initialized = true;
+    _initialized     = true;
+    hybx_sensor_ready = true;
     return true;
 }
 
