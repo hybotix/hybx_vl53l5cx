@@ -39,19 +39,10 @@
 #include "platform.h"
 #include <Arduino.h>
 #include <zephyr/drivers/i2c.h>
-/* I2C_MSG_STM32_USE_RELOAD_MODE is a private STM32 I2C V2 driver flag
- * defined in <zephyr/drivers/i2c/i2c_ll_stm32.h> (llext-edk, not in
- * the standard sketch include path). We define the value directly —
- * it is BIT(7) = 0x80, verified against the installed header at:
- * ~/.arduino15/packages/arduino/hardware/zephyr/0.54.1/variants/
- *   arduino_uno_q_stm32u585xx/llext-edk/include/zephyr/drivers/i2c/
- *   i2c_ll_stm32.h
- * This flag instructs the STM32 I2C V2 driver to use hardware RELOAD
- * mode for transfers > 255 bytes instead of generating new START
- * conditions at each 255-byte boundary. */
-#ifndef I2C_MSG_STM32_USE_RELOAD_MODE
-#define I2C_MSG_STM32_USE_RELOAD_MODE   (1U << 7U)
-#endif
+/* I2C_MSG_STM32_USE_RELOAD_MODE was removed — it causes the STM32 I2C
+ * hardware to block indefinitely (bypassing the kernel timeout) when
+ * used with large multi-segment transfers. We rely on address-
+ * incrementing chunked writes instead, each within the 500ms limit. */
 
 /* -------------------------------------------------------------------------
  * RdByte — read one byte from RegisterAddress.
@@ -130,28 +121,18 @@ extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
  * WrMulti — write size bytes from p_values to RegisterAddress.
  *
  * The STM32U5 I2C driver has a kernel-level transfer timeout of 500ms
- * (CONFIG_I2C_STM32_TRANSFER_TIMEOUT_MSEC). At 400kHz, a single 32KB
- * transfer takes ~0.7 seconds, exceeding this limit and causing the
- * kernel semaphore to timeout, aborting the transfer.
- *
- * Solution: chunk at HYBX_I2C_WR_CHUNK bytes per i2c_transfer() call.
- * At 400kHz, 16KB takes ~0.37 seconds — safely within 500ms.
- *
- * The VL53L5CX requires a 16-bit register address with EVERY I2C
- * transaction — there is no auto-increment across separate transactions.
- * Each chunk sends its own address (RegisterAddress + offset).
+ * (CONFIG_I2C_STM32_TRANSFER_TIMEOUT_MSEC). We chunk writes to stay
+ * within this limit. Each chunk is a separate i2c_transfer() call with
+ * an incremented address so the sensor receives data at the correct
+ * register location.
  *
  * Each chunk uses i2c_transfer() with two message segments:
  *   msg[0]: 2-byte register address (WRITE, no STOP)
  *   msg[1]: chunk data              (WRITE | STOP)
- *
- * I2C_MSG_STM32_USE_RELOAD_MODE on msg[1] enables hardware RELOAD for
- * the internal 255-byte boundaries within each chunk, keeping each
- * chunk as a single continuous I2C transaction on the wire.
  * -------------------------------------------------------------------------*/
 
 /* Maximum bytes per WrMulti chunk — must complete within 500ms at 400kHz.
- * 16384 bytes × 9 bits / 400000 bps ≈ 0.37s — well within 500ms limit. */
+ * 4096 bytes × 9 bits / 400000 bps ≈ 0.09s — well within 500ms limit. */
 #define HYBX_I2C_WR_CHUNK  4096U
 
 extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
@@ -182,8 +163,7 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
         msgs[0].flags = I2C_MSG_WRITE;
         msgs[1].buf   = p_values + offset;
         msgs[1].len   = chunk;
-        msgs[1].flags = I2C_MSG_WRITE | I2C_MSG_STOP
-                        | I2C_MSG_STM32_USE_RELOAD_MODE;
+        msgs[1].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
 
         int ret = i2c_transfer(p_platform->i2c_dev,
                                msgs, 2,
