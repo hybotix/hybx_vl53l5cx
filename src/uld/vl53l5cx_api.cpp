@@ -267,6 +267,7 @@ uint8_t vl53l5cx_init(VL53L5CX_Configuration *p_dev)
 	/* Wait for sensor booted (several ms required to get sensor ready ) */
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
 	status |= _vl53l5cx_poll_for_answer(p_dev, 1, 0, 0x06, 0xff, 1);
+	if (status) return status;
 
 	status |= WrByte(&(p_dev->platform), 0x000E, 0x01);
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
@@ -275,6 +276,7 @@ uint8_t vl53l5cx_init(VL53L5CX_Configuration *p_dev)
 	status |= WrByte(&(p_dev->platform), 0x03, 0x0D);
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x01);
 	status |= _vl53l5cx_poll_for_answer(p_dev, 1, 0, 0x21, 0x10, 0x10);
+	if (status) return status;
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
 
 	/* Enable host access to GO1 */
@@ -311,12 +313,14 @@ uint8_t vl53l5cx_init(VL53L5CX_Configuration *p_dev)
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x0b);
 	status |= WrMulti(&(p_dev->platform), 0, (uint8_t *) & VL53L5CX_FIRMWARE[0x10000], 0x5000);
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x01);
+	if (status) return status;
 
 	/* Check if FW correctly downloaded */
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
 	status |= WrByte(&(p_dev->platform), 0x03, 0x0D);
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x01);
 	status |= _vl53l5cx_poll_for_answer(p_dev, 1, 0, 0x21, 0x10, 0x10); //0x10
+	if (status) return status;
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
 	status |= WrByte(&(p_dev->platform), 0x0C, 0x01);
 
@@ -330,11 +334,13 @@ uint8_t vl53l5cx_init(VL53L5CX_Configuration *p_dev)
 	status |= WrByte(&(p_dev->platform), 0x0C, 0x00);
 	status |= WrByte(&(p_dev->platform), 0x0B, 0x01);
 	status |= _vl53l5cx_poll_for_answer(p_dev, 1, 0, 0x06, 0xff, 0x00);
+	if (status) return status;
 	status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
 
 	/* Get offset NVM data and store them into the offset buffer */
 	status |= WrMulti(&(p_dev->platform), 0x2fd8, (uint8_t *)VL53L5CX_GET_NVM_CMD, sizeof(VL53L5CX_GET_NVM_CMD));
 	status |= _vl53l5cx_poll_for_answer(p_dev, 4, 0, VL53L5CX_UI_CMD_STATUS, 0xff, 2);
+	if (status) return status;
 
 	status |= RdMulti(&(p_dev->platform), VL53L5CX_UI_CMD_START, p_dev->temp_buffer, VL53L5CX_NVM_DATA_SIZE);
 
