@@ -120,44 +120,44 @@ extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
 /* -------------------------------------------------------------------------
  * WrMulti — write size bytes from p_values to RegisterAddress.
  *
- * The STM32U5 I2C driver has a kernel-level transfer timeout of 500ms
- * (CONFIG_I2C_STM32_TRANSFER_TIMEOUT_MSEC). We chunk writes to stay
- * within this limit. Each chunk is a separate i2c_transfer() call with
- * an incremented address so the sensor receives data at the correct
- * register location.
+ * TWO MODES depending on the write target:
  *
- * Each chunk uses i2c_transfer() with two message segments:
- *   msg[0]: 2-byte register address (WRITE, no STOP)
- *   msg[1]: chunk data              (WRITE | STOP)
+ * 1. STREAMING PAGE WRITES (RegisterAddress == 0 && size > HYBX_I2C_WR_CHUNK):
+ *    The VL53L5CX firmware pages (0x09/0x0a/0x0b) are streaming buffers.
+ *    The write pointer auto-advances on each byte received — a new I2C START
+ *    with address 0x0000 does NOT reset the pointer. Each chunk sends 0x0000
+ *    so the sensor continues streaming from where it left off.
+ *
+ * 2. NORMAL REGISTER WRITES (all other calls):
+ *    Standard register space requires the address of each byte. The address
+ *    increments by chunk size across calls, matching SparkFun's implementation.
+ *
+ * Each chunk must complete within the STM32 500ms kernel timeout. At 400kHz,
+ * 4096 bytes takes ~0.09s — well within the limit.
  * -------------------------------------------------------------------------*/
 
-/* Maximum bytes per WrMulti chunk — must complete within 500ms at 400kHz.
- * 4096 bytes × 9 bits / 400000 bps ≈ 0.09s — well within 500ms limit. */
 #define HYBX_I2C_WR_CHUNK  4096U
 
 extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
                             uint8_t *p_values, uint32_t size)
 {
+    bool streaming = (RegisterAddress == 0 && size > HYBX_I2C_WR_CHUNK);
     uint32_t offset = 0;
+
     while (offset < size) {
         uint32_t chunk = size - offset;
         if (chunk > HYBX_I2C_WR_CHUNK) {
             chunk = HYBX_I2C_WR_CHUNK;
         }
 
-        /* The VL53L5CX uses a 16-bit register address. Each I2C transaction
-         * must present the address of the first byte in that chunk.
-         * The address increments across chunks so each chunk writes to the
-         * correct location within the page. */
-        uint16_t chunkAddr = RegisterAddress + (uint16_t)offset;
+        uint16_t chunkAddr = streaming ? 0 : (RegisterAddress + (uint16_t)offset);
         uint8_t reg[2] = {
             (uint8_t)(chunkAddr >> 8),
             (uint8_t)(chunkAddr & 0xFF)
         };
 
         struct i2c_msg msgs[2];
-
         msgs[0].buf   = reg;
         msgs[0].len   = sizeof(reg);
         msgs[0].flags = I2C_MSG_WRITE;
