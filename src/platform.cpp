@@ -76,11 +76,10 @@ extern "C" uint8_t RdByte(VL53L5CX_Platform *p_platform,
  *
  * Normal register writes (all other calls):
  *   Address increments by chunk size across chunks.
- *
- * Wire1.write(buf, len) has no size limit — streams all bytes in one
- * I2C transaction per chunk with no intermediate STOP conditions.
+ * Wire1's internal TX buffer is 256 bytes. With 2-byte address sent as a
+ * separate transaction, the data transaction can be up to 254 bytes.
  * -------------------------------------------------------------------------*/
-#define HYBX_I2C_WR_CHUNK  4096U
+#define HYBX_I2C_WR_CHUNK  254U
 
 extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
