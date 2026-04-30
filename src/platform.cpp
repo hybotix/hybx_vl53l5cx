@@ -95,9 +95,15 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
 
         uint16_t chunkAddr = streaming ? 0 : (RegisterAddress + (uint16_t)offset);
 
+        /* Send register address as separate transaction (no STOP between
+         * addr and data — use endTransmission(false) for repeated START) */
         Wire1.beginTransmission((uint8_t)p_platform->address);
         Wire1.write((uint8_t)(chunkAddr >> 8));
         Wire1.write((uint8_t)(chunkAddr & 0xFF));
+        if (Wire1.endTransmission(false) != 0) return 1;
+
+        /* Send data */
+        Wire1.beginTransmission((uint8_t)p_platform->address);
         Wire1.write(p_values + offset, (size_t)chunk);
         if (Wire1.endTransmission() != 0) return 1;
 
