@@ -84,15 +84,14 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
                             uint8_t *p_values, uint32_t size)
 {
-    bool     streaming = (RegisterAddress == 0 && size > 1024U);
-    uint32_t offset    = 0;
+    uint32_t offset = 0;
     static uint8_t txbuf[HYBX_I2C_WR_CHUNK + 2];
 
     while (offset < size) {
         uint32_t chunk = size - offset;
         if (chunk > HYBX_I2C_WR_CHUNK) chunk = HYBX_I2C_WR_CHUNK;
 
-        uint16_t chunkAddr = streaming ? 0 : (RegisterAddress + (uint16_t)offset);
+        uint16_t chunkAddr = RegisterAddress + (uint16_t)offset;
 
         txbuf[0] = (uint8_t)(chunkAddr >> 8);
         txbuf[1] = (uint8_t)(chunkAddr & 0xFF);
