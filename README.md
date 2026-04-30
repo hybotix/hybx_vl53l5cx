@@ -240,3 +240,45 @@ String get_sensor_status() {
 
 *Hybrid RobotiX — San Diego*
 *"I. WILL. NEVER. GIVE. UP. OR. SURRENDER."*
+
+---
+
+## Platform Layer — Wire1 Implementation
+
+### Why Wire1, not Zephyr native I2C
+
+The original platform layer used Zephyr's native `i2c_transfer()` API directly. This caused **indefinite hangs** during the VL53L5CX firmware upload (~96KB across three 32KB pages) when Arduino RouterBridge was running. The Zephyr STM32 I2C kernel driver and the RouterBridge are incompatible — root cause not fully understood but consistently reproduced.
+
+Wire1 (the Arduino QWIIC bus on the UNO Q) works correctly with the Bridge running — confirmed by the `vl53-diag` diagnostic app:
+- I2C probe at 0x29 ✅
+- Page select write (reg 0x7FFF) ✅  
+- Device ID read (expect 0xF0) ✅
+- Revision ID read (expect 0x02) ✅
+
+### CRITICAL: Never call Wire1.begin()
+
+Calling `Wire1.begin()` after `Bridge.begin()` **hangs the MCU permanently**. Wire1 works on the UNO Q without explicit initialization. This is an undocumented behavior of the Arduino Zephyr port.
+
+The correct order in `setup()`:
+```cpp
+Bridge.begin();
+Bridge.provide(...);
+// Wire1.begin() — DO NOT CALL
+sensor.begin();  // Uses Wire1 internally, no begin() needed
+```
+
+### Wire1 size limits
+
+- **Write**: `Wire1.write(buf, len)` streams bytes with no practical size limit — the full 32KB firmware page is written in 4KB chunks per `beginTransmission`/`endTransmission` cycle.
+- **Read**: `Wire1.requestFrom()` is limited to 256 bytes per call. `RdMulti` chunks reads at 256 bytes with incrementing address.
+
+### When the library changes, force a recompile
+
+The HybX sketch hash only tracks `.ino` file changes. If the library (`hybx_vl53l5cx`) changes, the sketch hash won't detect it and `start` will skip recompile. Always use `clean <app>` after a library update — it passes `--compile` to `start` which forces a full recompile regardless of hash.
+
+```bash
+update
+board sync --force
+clean monitor-vl53l5cx
+mon
+```
