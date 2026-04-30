@@ -291,3 +291,75 @@ board sync --force
 clean monitor-vl53l5cx
 mon
 ```
+
+---
+
+## Confidence Values (0.00 - 99.99%)
+
+Each zone returns a confidence value computed from `signal_per_spad` and
+`range_sigma_mm`:
+
+```
+signal_score = min(signal_per_spad / 8000.0, 1.0)
+sigma_score  = max(0, 1 - range_sigma_mm / 30.0)
+confidence   = (signal_score * 0.6 + sigma_score * 0.4) * 99.99
+```
+
+If `target_status` is not 5 or 9, confidence is 0.00% regardless.
+
+### Typical confidence ranges
+
+| Confidence | Meaning |
+|-----------|---------|
+| 0%        | Invalid zone — no valid return |
+| 1–40%     | Long range or weak return — use with caution |
+| 40–80%    | Medium confidence |
+| 80–99%    | High confidence — strong, clean return |
+
+### Observed values
+
+- Close target (~90mm): 91–99% in center zones, decreasing toward edges
+- Wall at ~1.6–2.0m: 20–33% across zones — physically correct
+- Invalid edge zones: exactly 0%
+
+Confidence naturally drops with distance as signal weakens and sigma
+increases — this is the expected physical behavior.
+
+---
+
+## Development History
+
+This library was developed as part of the **Hybrid RobotiX** project by
+Dale Weber (N7PKT) for the Arduino UNO Q running HybX Development System v2.0.
+
+### Key discoveries made during development
+
+1. **Wire1.begin() must be called BEFORE Bridge.begin()** — calling it after
+   hangs the MCU permanently with no error.
+
+2. **#include <Wire.h> must be in the sketch, not the library** — including
+   it in a library causes auto-initialization before `setup()` runs.
+
+3. **sensor.begin() must be triggered from Linux** — calling it in `setup()`
+   blocks the Bridge transport during the ~30s firmware upload. The Linux
+   side calls `begin_sensor()` as a Bridge function which blocks on the
+   Linux side while the MCU uploads firmware.
+
+4. **WrMulti must always increment the register address** — the VL53L5CX
+   firmware page memory does NOT auto-advance on repeated transactions at
+   the same address. Each 254-byte chunk must use address + offset.
+
+5. **Wire1 TX buffer is 256 bytes** — maximum data payload per
+   `endTransmission()` is 254 bytes (256 minus 2-byte address).
+
+6. **Wire1 requestFrom() limit is 255 bytes** — RdMulti chunks reads
+   at 255 bytes with incrementing address.
+
+7. **arduino-app-cli caches binaries by sketch hash** — library changes
+   are invisible to the cache. HybX Development System v2.0 replaces
+   arduino-app-cli with HybXCompiler + HybXFlasher + HybXRunner which
+   always compile fresh.
+
+8. **Zephyr native i2c_transfer() hangs with RouterBridge** — the platform
+   layer uses Wire1 (which internally calls i2c_write/i2c_write_read via
+   the Zephyr I2C driver) rather than calling i2c_transfer() directly.
