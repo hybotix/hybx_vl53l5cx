@@ -3,26 +3,18 @@
  * Hybrid RobotiX — hybx_vl53l5cx
  * Dale Weber <hybotix@hybridrobotix.io>
  *
- * VL53L5CX ULD platform layer for Arduino UNO Q — Wire1 implementation.
+ * VL53L5CX ULD platform layer for Arduino UNO Q — Zephyr native I2C.
  *
- * WHY WIRE1 INSTEAD OF ZEPHYR NATIVE I2C?
- * ----------------------------------------
- * Zephyr native i2c_transfer() hangs indefinitely during the VL53L5CX
- * firmware upload when Arduino RouterBridge is running. The Bridge
- * interferes with the Zephyr STM32 I2C kernel driver.
+ * Uses Zephyr native i2c_write() and i2c_write_read() directly via
+ * DEVICE_DT_GET(DT_NODELABEL(i2c4)). These yield between chunks via
+ * the Zephyr completion semaphore, allowing the Bridge update thread
+ * to respond during the firmware upload.
  *
- * Wire1 (Arduino QWIIC bus) works correctly with the Bridge — confirmed
- * by vl53-diag: probe, page select, device ID (0xF0), revision ID (0x02)
- * all pass with Bridge running.
+ * Wire1.begin() must be called BEFORE Bridge.begin() to initialize
+ * the I2C peripheral — but subsequent I2C operations use Zephyr native
+ * API directly for proper thread yielding behavior.
  *
- * CRITICAL: Wire1.begin() must NEVER be called. Calling it after
- * Bridge.begin() hangs the MCU. Wire1 works without explicit
- * initialization on the UNO Q.
- *
- * Wire1 write: unlimited streaming via write(buf, len) — no size limit.
- * Wire1 read:  256 bytes max per requestFrom() call — RdMulti chunks.
- *
- * VL53L5CX_Platform holds only the 7-bit I2C address — Wire1 is global.
+ * VL53L5CX_Platform holds only the 7-bit I2C address.
  *
  * NOTE: Function names (RdByte, WrByte, RdMulti, WrMulti, SwapBuffer,
  * WaitMs) are MANDATED by the ST Ultra Lite Driver API. They cannot be
