@@ -23,7 +23,6 @@ uint8_t hybx_target_status[64];
 bool    hybx_sensor_ready    = false;
 uint8_t hybx_last_error      = HYBX_ERR_NONE;
 uint8_t hybx_last_error_step = HYBX_ERR_NONE;
-uint8_t hybx_init_step       = 0;
 
 /* -------------------------------------------------------------------------
  * Constructor

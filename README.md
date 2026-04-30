@@ -257,19 +257,24 @@ Wire1 (the Arduino QWIIC bus on the UNO Q) works correctly with the Bridge runni
 
 ### CRITICAL: Wire1.begin() must be called BEFORE Bridge.begin()
 
-Calling `Wire1.begin()` AFTER `Bridge.begin()` **hangs the MCU permanently**. Also, `#include <Wire.h>` must be in the **sketch**, not this library — including it in a library auto-initializes Wire1 before `setup()` runs, also hanging the MCU.
+Calling `Wire1.begin()` AFTER `Bridge.begin()` **hangs the MCU permanently**.
 
-The correct order in `setup()`:
+The correct pattern (confirmed working):
 ```cpp
-#include <Wire.h>          // In the SKETCH — not the library
+#include <Wire.h>          // Must be in the SKETCH
 
 void setup() {
     Wire1.begin();         // MUST be before Bridge.begin()
     Bridge.begin();
-    Bridge.provide(...);
-    sensor.begin();
+    Bridge.provide("begin_sensor", begin_sensor);
+    Bridge.provide("get_sensor_status", get_sensor_status);
+    // ... other Bridge.provide() calls ...
 }
 ```
+
+`sensor.begin()` is NOT called in `setup()` — it is triggered from the
+Linux side via a Bridge call (`begin_sensor()`). This prevents the firmware
+upload from blocking the Bridge transport.
 
 ### Wire1 size limits
 

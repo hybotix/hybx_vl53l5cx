@@ -24,8 +24,10 @@
  *
  * I2C
  * ---
- * Uses Arduino Wire1 (QWIIC bus) — no Wire1.begin() needed or allowed.
- * Wire1.begin() hangs the MCU when called after Bridge.begin().
+ * Uses Zephyr native i2c_write()/i2c_write_read() via i2c4 device.
+ * Wire1.begin() must be called BEFORE Bridge.begin() in the sketch
+ * to initialize the I2C peripheral. After that, the library uses
+ * Zephyr native I2C directly — Wire1 methods are not used.
  * Default address 0x29.
  *
  * License: MIT (our code) — ST ULD files carry BSD 3-clause.
@@ -59,7 +61,6 @@ extern uint8_t  hybx_target_status[64];
 extern bool     hybx_sensor_ready;
 extern uint8_t  hybx_last_error;       /* ULD status code of last failure */
 extern uint8_t  hybx_last_error_step;  /* HYBX_ERR_* step that failed */
-extern uint8_t  hybx_init_step;        /* diagnostic: poll checkpoint reached in vl53l5cx_init */
 
 /* -------------------------------------------------------------------------
  * hybx_vl53l5cx — thin, heap-free driver class
@@ -70,7 +71,7 @@ public:
      * Constructor.
      * resolution : 16 (4x4) or 64 (8x8). Default 64.
      * address    : 7-bit I2C address. Default 0x29.
-     * Wire1 is used automatically — never call Wire1.begin().
+     * Call Wire1.begin() before Bridge.begin() in the sketch.
      */
     hybx_vl53l5cx(uint8_t resolution = 64,
                   uint8_t address    = 0x29);
