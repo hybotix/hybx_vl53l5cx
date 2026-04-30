@@ -108,7 +108,7 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
         if (Wire1.endTransmission() != 0) return 1;
 
         offset += chunk;
-        k_yield();   /* let Bridge thread respond between chunks */
+        k_msleep(1);   /* allow UART DMA to complete between I2C chunks */
     }
     return 0;
 }
