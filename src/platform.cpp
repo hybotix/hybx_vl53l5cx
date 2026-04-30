@@ -11,12 +11,8 @@
  * firmware upload when Arduino RouterBridge is running. Wire1 works
  * correctly with the Bridge — confirmed by vl53-diag.
  *
- * CRITICAL: #include <Wire.h> must be in the SKETCH, not this library.
- * Including it here auto-inits Wire1 before setup() and hangs the MCU.
- * The sketch must include Wire.h before including hybx_vl53l5cx.h.
- *
- * CRITICAL: Wire1.begin() must NEVER be called. It hangs the MCU when
- * called after Bridge.begin(). Wire1 works without initialization.
+ * CRITICAL: Wire1.begin() must be called BEFORE Bridge.begin() in setup().
+ * Calling Wire1.begin() after Bridge.begin() hangs the MCU permanently.
  *
  * WIRE1 LIMITS:
  * - Write: Wire1.write(buf, len) streams bytes with no size limit.
@@ -35,16 +31,10 @@
 
 #include "platform.h"
 #include <Arduino.h>
+#include <Wire.h>
 #include <string.h>
 
-/* Forward-declare Wire1 from the Arduino Zephyr Wire implementation.
- * We do NOT /* Wire.h included by the sketch — not here (causes auto-init hang with Bridge) */ here — including it in a library causes
- * the Arduino build system to auto-initialize Wire1 before setup() runs,
- * which hangs the MCU when Bridge is used. Wire1 is a global defined by
- * the Arduino core and is always available without the include. */
-extern TwoWire Wire1;
-
-/* Maximum bytes per RdMulti chunk — Wire1.requestFrom() limit is 256 */
+/* Maximum bytes per RdMulti chunk — Wire1.requestFrom() limit is 255 */
 #define HYBX_I2C_RD_CHUNK  255U
 
 /* -------------------------------------------------------------------------
