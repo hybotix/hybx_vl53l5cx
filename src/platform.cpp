@@ -45,7 +45,7 @@
 extern TwoWire Wire1;
 
 /* Maximum bytes per RdMulti chunk — Wire1.requestFrom() limit is 256 */
-#define HYBX_I2C_RD_CHUNK  256U
+#define HYBX_I2C_RD_CHUNK  255U
 
 /* -------------------------------------------------------------------------
  * WrByte — write one byte to RegisterAddress via Wire1.
@@ -119,7 +119,7 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
 /* -------------------------------------------------------------------------
  * RdMulti — read size bytes from RegisterAddress via Wire1.
  *
- * Chunked at HYBX_I2C_RD_CHUNK (256) bytes — Wire1.requestFrom() limit.
+ * Chunked at HYBX_I2C_RD_CHUNK (255) bytes — Wire1.requestFrom() limit.
  * Address increments across chunks.
  * -------------------------------------------------------------------------*/
 extern "C" uint8_t RdMulti(VL53L5CX_Platform *p_platform,
