@@ -255,16 +255,20 @@ Wire1 (the Arduino QWIIC bus on the UNO Q) works correctly with the Bridge runni
 - Device ID read (expect 0xF0) ✅
 - Revision ID read (expect 0x02) ✅
 
-### CRITICAL: Never call Wire1.begin()
+### CRITICAL: Wire1.begin() must be called BEFORE Bridge.begin()
 
-Calling `Wire1.begin()` after `Bridge.begin()` **hangs the MCU permanently**. Wire1 works on the UNO Q without explicit initialization. This is an undocumented behavior of the Arduino Zephyr port.
+Calling `Wire1.begin()` AFTER `Bridge.begin()` **hangs the MCU permanently**. Also, `#include <Wire.h>` must be in the **sketch**, not this library — including it in a library auto-initializes Wire1 before `setup()` runs, also hanging the MCU.
 
 The correct order in `setup()`:
 ```cpp
-Bridge.begin();
-Bridge.provide(...);
-// Wire1.begin() — DO NOT CALL
-sensor.begin();  // Uses Wire1 internally, no begin() needed
+#include <Wire.h>          // In the SKETCH — not the library
+
+void setup() {
+    Wire1.begin();         // MUST be before Bridge.begin()
+    Bridge.begin();
+    Bridge.provide(...);
+    sensor.begin();
+}
 ```
 
 ### Wire1 size limits
