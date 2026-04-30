@@ -31,8 +31,14 @@
 
 #include "platform.h"
 #include <Arduino.h>
-#include <Wire.h>
 #include <string.h>
+
+/* Forward-declare Wire1 from the Arduino Zephyr Wire implementation.
+ * We do NOT #include <Wire.h> here — including it in a library causes
+ * the Arduino build system to auto-initialize Wire1 before setup() runs,
+ * which hangs the MCU when Bridge is used. Wire1 is a global defined by
+ * the Arduino core and is always available without the include. */
+extern TwoWire Wire1;
 
 /* Maximum bytes per RdMulti chunk — Wire1.requestFrom() limit is 256 */
 #define HYBX_I2C_RD_CHUNK  256U
