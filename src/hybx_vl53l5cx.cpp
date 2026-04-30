@@ -18,8 +18,10 @@
  * -------------------------------------------------------------------------*/
 VL53L5CX_Configuration hybx_vl53l5cx::_dev;
 
-int16_t hybx_distance_mm[64];
-uint8_t hybx_target_status[64];
+int16_t  hybx_distance_mm[64];
+uint8_t  hybx_target_status[64];
+uint32_t hybx_signal_per_spad[64];
+uint16_t hybx_range_sigma_mm[64];
 bool    hybx_sensor_ready    = false;
 uint8_t hybx_last_error      = HYBX_ERR_NONE;
 uint8_t hybx_last_error_step = HYBX_ERR_NONE;
@@ -158,8 +160,10 @@ void hybx_vl53l5cx::_readFrame()
 
     uint8_t zones = _resolution;
     for (uint8_t i = 0; i < zones; i++) {
-        hybx_distance_mm[i]   = results.distance_mm[i];
-        hybx_target_status[i] = results.target_status[i];
+        hybx_distance_mm[i]    = results.distance_mm[i];
+        hybx_target_status[i]  = results.target_status[i];
+        hybx_signal_per_spad[i] = results.signal_per_spad[i];
+        hybx_range_sigma_mm[i]  = results.range_sigma_mm[i];
     }
 
     /* Clear any previous error once a frame is successfully read */
