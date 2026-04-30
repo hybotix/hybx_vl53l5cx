@@ -86,6 +86,11 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
                             uint16_t RegisterAddress,
                             uint8_t *p_values, uint32_t size)
 {
+    /* Wire1 TX ring buffer is 256 bytes total.
+     * Each transaction: 2 bytes address + up to 254 bytes data.
+     * Address and data MUST be in the same beginTransmission/endTransmission
+     * cycle — endTransmission() ignores the stopBit parameter and always
+     * issues a STOP, so two-transaction approach doesn't work. */
     bool     streaming = (RegisterAddress == 0 && size > 1024U);
     uint32_t offset    = 0;
 
@@ -95,20 +100,14 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
 
         uint16_t chunkAddr = streaming ? 0 : (RegisterAddress + (uint16_t)offset);
 
-        /* Send register address as separate transaction (no STOP between
-         * addr and data — use endTransmission(false) for repeated START) */
         Wire1.beginTransmission((uint8_t)p_platform->address);
         Wire1.write((uint8_t)(chunkAddr >> 8));
         Wire1.write((uint8_t)(chunkAddr & 0xFF));
-        if (Wire1.endTransmission(false) != 0) return 1;
-
-        /* Send data */
-        Wire1.beginTransmission((uint8_t)p_platform->address);
         Wire1.write(p_values + offset, (size_t)chunk);
         if (Wire1.endTransmission() != 0) return 1;
 
         offset += chunk;
-        k_msleep(1);   /* allow UART DMA to complete between I2C chunks */
+        k_msleep(1);
     }
     return 0;
 }
