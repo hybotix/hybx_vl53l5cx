@@ -33,6 +33,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <string.h>
+#include <zephyr/kernel.h>   /* k_yield() */
 
 /* Maximum bytes per RdMulti chunk — Wire1.requestFrom() limit is 255 */
 #define HYBX_I2C_RD_CHUNK  255U
@@ -107,6 +108,7 @@ extern "C" uint8_t WrMulti(VL53L5CX_Platform *p_platform,
         if (Wire1.endTransmission() != 0) return 1;
 
         offset += chunk;
+        k_yield();   /* let Bridge thread respond between chunks */
     }
     return 0;
 }
@@ -174,5 +176,6 @@ extern "C" uint8_t WaitMs(VL53L5CX_Platform *p_platform, uint32_t TimeMs)
 {
     (void)p_platform;
     delay(TimeMs);
+    k_yield();
     return 0;
 }
