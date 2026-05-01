@@ -17,9 +17,24 @@
  *   hybx_signal_per_spad[8][8]  uint32_t signal strength (kcps/SPAD)
  *   hybx_range_sigma_mm[8][8]   uint16_t ranging sigma (mm)
  *
- * Zone layout (8x8, standard mounting):
- *   [0][0] = upper-left   [0][7] = upper-right
- *   [7][0] = lower-left   [7][7] = lower-right
+ * Zone layout (8x8, confirmed physical orientation):
+ *
+ *   Orientation: SparkFun logo at TOP, lens facing FORWARD.
+ *   Left/right defined from BEHIND the sensor looking forward
+ *   (same direction as the robot travels) — this matches the
+ *   robot's frame of reference for navigation.
+ *
+ *   [0][0] = upper-left   [0][7] = upper-right   ← row 0 = TOP of FOV
+ *   [4][0] = mid-left     [4][7] = mid-right      ← obstacle detection rows
+ *   [7][0] = lower-left   [7][7] = lower-right    ← row 7 = BOTTOM of FOV
+ *
+ *   col 0 = robot LEFT    col 7 = robot RIGHT
+ *   col 3-4 = robot CENTER (forward path)
+ *
+ *   Physically verified on SparkFun large VL53L5CX breakout (SEN-18642):
+ *   - Row 0 confirmed TOP by hand test (upper FOV shows close distance)
+ *   - Col 0 confirmed LEFT by hand test (standing behind sensor, looking
+ *     forward in robot's direction of travel)
  *
  * ERROR REPORTING
  * ---------------
