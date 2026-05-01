@@ -11,11 +11,15 @@
  * This library uses ZERO heap — all buffers including the ST ULD's temp_buffer
  * are static globals placed in BSS by the linker.
  *
- * Only two result arrays are allocated:
- *   hybx_distance_mm[64]      int16_t  millimetres, zones 0-63
- *   hybx_target_status[64]    uint8_t  ST status codes (5 or 9 = valid)
- *   hybx_signal_per_spad[64]  uint32_t signal strength (kcps/SPAD)
- *   hybx_range_sigma_mm[64]   uint16_t ranging sigma (mm)
+ * Four result arrays are allocated as [8][8] grids:
+ *   hybx_distance_mm[8][8]      int16_t  millimetres, [row][col]
+ *   hybx_target_status[8][8]    uint8_t  ST status codes (5 or 9 = valid)
+ *   hybx_signal_per_spad[8][8]  uint32_t signal strength (kcps/SPAD)
+ *   hybx_range_sigma_mm[8][8]   uint16_t ranging sigma (mm)
+ *
+ * Zone layout (8x8, standard mounting):
+ *   [0][0] = upper-left   [0][7] = upper-right
+ *   [7][0] = lower-left   [7][7] = lower-right
  *
  * ERROR REPORTING
  * ---------------
@@ -58,10 +62,10 @@
 /* -------------------------------------------------------------------------
  * Public result and error globals — BSS allocation, defined in .cpp
  * -------------------------------------------------------------------------*/
-extern int16_t  hybx_distance_mm[64];
-extern uint8_t  hybx_target_status[64];
-extern uint32_t hybx_signal_per_spad[64];
-extern uint16_t hybx_range_sigma_mm[64];
+extern int16_t  hybx_distance_mm[8][8];
+extern uint8_t  hybx_target_status[8][8];
+extern uint32_t hybx_signal_per_spad[8][8];
+extern uint16_t hybx_range_sigma_mm[8][8];
 extern bool     hybx_sensor_ready;
 extern uint8_t  hybx_last_error;       /* ULD status code of last failure */
 extern uint8_t  hybx_last_error_step;  /* HYBX_ERR_* step that failed */
