@@ -287,4 +287,7 @@ increases. This is the expected physical behavior.
 ---
 
 *Hybrid RobotiX — San Diego*
+*Empowering developers to go beyond what standard development systems allow —
+taking full control without being constrained by vendor tools that cannot,
+will not, or refuse to provide what professional development demands.*
 *"I. WILL. NEVER. GIVE. UP. OR. SURRENDER."*
