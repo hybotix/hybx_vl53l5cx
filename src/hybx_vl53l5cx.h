@@ -122,6 +122,14 @@ public:
      */
     bool setResolution(uint8_t resolution);
 
+    /*
+     * stop() — stop ranging cleanly.
+     * Safe to call even if begin() was never called.
+     * Resets _initialized so begin() can be called again.
+     * Returns true on success, false on ULD error.
+     */
+    bool stop();
+
     uint8_t getResolution() const { return _resolution; }
 
 private:

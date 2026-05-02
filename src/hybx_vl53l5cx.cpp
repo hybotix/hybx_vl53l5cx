@@ -123,6 +123,23 @@ bool hybx_vl53l5cx::setResolution(uint8_t resolution)
 }
 
 /* -------------------------------------------------------------------------
+ * stop()
+ * -------------------------------------------------------------------------*/
+bool hybx_vl53l5cx::stop()
+{
+    if (!_initialized) return true;   // nothing to stop
+
+    uint8_t status = vl53l5cx_stop_ranging(&_dev);
+    hybx_sensor_ready = false;
+    _initialized      = false;
+
+    if (status != VL53L5CX_STATUS_OK) {
+        return _fail(HYBX_ERR_STOP_RANGING, status);
+    }
+    return true;
+}
+
+/* -------------------------------------------------------------------------
  * poll()
  * -------------------------------------------------------------------------*/
 void hybx_vl53l5cx::poll()
