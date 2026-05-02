@@ -1,4 +1,4 @@
-# hybx_vl53l5cx
+# hybx_vl53l5cx_unoq
 Minimal, Heap-Free Library for the ST VL53L5CX 8x8 ToF Distance Sensor
 **Hybrid RobotiX — Dale Weber <hybotix@hybridrobotix.io>**
 
@@ -6,7 +6,7 @@ Minimal, Heap-Free Library for the ST VL53L5CX 8x8 ToF Distance Sensor
 
 ## Overview
 
-`hybx_vl53l5cx` is a minimal Arduino library for the ST VL53L5CX 8x8
+`hybx_vl53l5cx_unoq` is a minimal Arduino library for the ST VL53L5CX 8x8
 time-of-flight distance sensor, purpose-built for the **Arduino UNO Q /
 Zephyr RTOS** environment with the Arduino **RouterBridge**.
 
@@ -102,9 +102,9 @@ and RX.
 ```cpp
 #include <Arduino_RouterBridge.h>
 #include <Wire.h>              // Must be in the SKETCH — not in this library
-#include <hybx_vl53l5cx.h>
+#include <hybx_vl53l5cx_unoq.h>
 
-hybx_vl53l5cx sensor;
+hybx_vl53l5cx_unoq sensor;
 
 String get_sensor_status() { ... }
 String begin_sensor() {
@@ -146,13 +146,13 @@ auto-initialize Wire1 before `setup()` runs — also hanging the MCU.
 ## Library Structure
 
 ```
-hybx_vl53l5cx/
+hybx_vl53l5cx_unoq/
   library.properties
   src/
     platform.h            VL53L5CX_Platform struct + platform declarations
     platform.cpp          Wire1: RdByte/WrByte/RdMulti/WrMulti/SwapBuffer/WaitMs
-    hybx_vl53l5cx.h       Driver class + public result globals
-    hybx_vl53l5cx.cpp     Driver implementation
+    hybx_vl53l5cx_unoq.h       Driver class + public result globals
+    hybx_vl53l5cx_unoq.cpp     Driver implementation
     uld/
       vl53l5cx_api.h      ST ULD API header (BSD 3-clause)
       vl53l5cx_api.cpp    ST ULD implementation (BSD 3-clause)
@@ -165,7 +165,7 @@ hybx_vl53l5cx/
 
 ```bash
 cd ~/Arduino/libraries
-git clone https://github.com/hybotix/hybx_vl53l5cx.git
+git clone https://github.com/hybotix/hybx_vl53l5cx_unoq.git
 ```
 
 Add to `sketch.yaml`:
@@ -182,7 +182,7 @@ profiles:
       - dependency: ArxTypeTraits (0.3.2)
       - dependency: DebugLog (0.8.4)
       - dependency: MsgPack (0.4.2)
-      - dir: /home/arduino/Arduino/libraries/hybx_vl53l5cx
+      - dir: /home/arduino/Arduino/libraries/hybx_vl53l5cx_unoq
 default_profile: default
 ```
 
@@ -208,9 +208,9 @@ zone 63 = bottom-right).
 ## Constructor
 
 ```cpp
-hybx_vl53l5cx sensor;                        // 8x8, address 0x29
-hybx_vl53l5cx sensor(16);                    // 4x4, address 0x29
-hybx_vl53l5cx sensor(64, 0x29);              // 8x8, custom address
+hybx_vl53l5cx_unoq sensor;                        // 8x8, address 0x29
+hybx_vl53l5cx_unoq sensor(16);                    // 4x4, address 0x29
+hybx_vl53l5cx_unoq sensor(64, 0x29);              // 8x8, custom address
 ```
 
 | Parameter | Default | Description |
@@ -281,7 +281,7 @@ increases. This is the expected physical behavior.
 
 | Component | License |
 |---|---|
-| `platform.h/cpp`, `hybx_vl53l5cx.h/cpp` | MIT © 2026 Dale Weber / Hybrid RobotiX |
+| `platform.h/cpp`, `hybx_vl53l5cx_unoq.h/cpp` | MIT © 2026 Dale Weber / Hybrid RobotiX |
 | `src/uld/` | BSD 3-clause © 2020 STMicroelectronics |
 
 ---

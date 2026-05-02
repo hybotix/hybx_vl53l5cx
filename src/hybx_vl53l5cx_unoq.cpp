@@ -1,6 +1,6 @@
 /*
- * hybx_vl53l5cx.cpp
- * Hybrid RobotiX — hybx_vl53l5cx
+ * hybx_vl53l5cx_unoq.cpp
+ * Hybrid RobotiX — hybx_vl53l5cx_unoq
  * Dale Weber <hybotix@hybridrobotix.io>
  *
  * No silent failures. Every ULD call result is checked.
@@ -10,13 +10,13 @@
  * License: MIT (our code) — ST ULD files carry BSD 3-clause.
  */
 
-#include "hybx_vl53l5cx.h"
+#include "hybx_vl53l5cx_unoq.h"
 #include <zephyr/drivers/i2c.h>
 
 /* -------------------------------------------------------------------------
  * Static definitions — all in BSS, zero heap.
  * -------------------------------------------------------------------------*/
-VL53L5CX_Configuration hybx_vl53l5cx::_dev;
+VL53L5CX_Configuration hybx_vl53l5cx_unoq::_dev;
 
 int16_t  hybx_distance_mm[8][8];
 uint8_t  hybx_target_status[8][8];
@@ -29,7 +29,7 @@ uint8_t hybx_last_error_step = HYBX_ERR_NONE;
 /* -------------------------------------------------------------------------
  * Constructor
  * -------------------------------------------------------------------------*/
-hybx_vl53l5cx::hybx_vl53l5cx(uint8_t resolution, uint8_t address)
+hybx_vl53l5cx_unoq::hybx_vl53l5cx_unoq(uint8_t resolution, uint8_t address)
     : _resolution(resolution), _initialized(false)
 {
     _dev.platform.address = (uint16_t)address;
@@ -38,7 +38,7 @@ hybx_vl53l5cx::hybx_vl53l5cx(uint8_t resolution, uint8_t address)
 /* -------------------------------------------------------------------------
  * _fail() — record error and return false
  * -------------------------------------------------------------------------*/
-bool hybx_vl53l5cx::_fail(uint8_t step, uint8_t uld_status)
+bool hybx_vl53l5cx_unoq::_fail(uint8_t step, uint8_t uld_status)
 {
     hybx_last_error_step = step;
     hybx_last_error      = uld_status;
@@ -48,7 +48,7 @@ bool hybx_vl53l5cx::_fail(uint8_t step, uint8_t uld_status)
 /* -------------------------------------------------------------------------
  * begin()
  * -------------------------------------------------------------------------*/
-bool hybx_vl53l5cx::begin()
+bool hybx_vl53l5cx_unoq::begin()
 {
     uint8_t status;
 
@@ -84,7 +84,7 @@ bool hybx_vl53l5cx::begin()
 /* -------------------------------------------------------------------------
  * setResolution()
  * -------------------------------------------------------------------------*/
-bool hybx_vl53l5cx::setResolution(uint8_t resolution)
+bool hybx_vl53l5cx_unoq::setResolution(uint8_t resolution)
 {
     if (!_initialized) {
         return _fail(HYBX_ERR_NOT_INITIALIZED, 0);
@@ -125,7 +125,7 @@ bool hybx_vl53l5cx::setResolution(uint8_t resolution)
 /* -------------------------------------------------------------------------
  * stop()
  * -------------------------------------------------------------------------*/
-bool hybx_vl53l5cx::stop()
+bool hybx_vl53l5cx_unoq::stop()
 {
     if (!_initialized) return true;   // nothing to stop
 
@@ -142,7 +142,7 @@ bool hybx_vl53l5cx::stop()
 /* -------------------------------------------------------------------------
  * poll()
  * -------------------------------------------------------------------------*/
-void hybx_vl53l5cx::poll()
+void hybx_vl53l5cx_unoq::poll()
 {
     if (!_initialized) {
         /* Not initialized — record as error so sketch can report it */
@@ -165,7 +165,7 @@ void hybx_vl53l5cx::poll()
 /* -------------------------------------------------------------------------
  * _readFrame()
  * -------------------------------------------------------------------------*/
-void hybx_vl53l5cx::_readFrame()
+void hybx_vl53l5cx_unoq::_readFrame()
 {
     static VL53L5CX_ResultsData results;
 

@@ -1,6 +1,6 @@
 /*
- * hybx_vl53l5cx.h
- * Hybrid RobotiX — hybx_vl53l5cx
+ * hybx_vl53l5cx_unoq.h
+ * Hybrid RobotiX — hybx_vl53l5cx_unoq
  * Dale Weber <hybotix@hybridrobotix.io>
  *
  * Minimal, heap-free VL53L5CX driver for the Arduino UNO Q / Zephyr RTOS.
@@ -86,9 +86,9 @@ extern uint8_t  hybx_last_error;       /* ULD status code of last failure */
 extern uint8_t  hybx_last_error_step;  /* HYBX_ERR_* step that failed */
 
 /* -------------------------------------------------------------------------
- * hybx_vl53l5cx — thin, heap-free driver class
+ * hybx_vl53l5cx_unoq — thin, heap-free driver class
  * -------------------------------------------------------------------------*/
-class hybx_vl53l5cx {
+class hybx_vl53l5cx_unoq {
 public:
     /*
      * Constructor.
@@ -96,7 +96,7 @@ public:
      * address    : 7-bit I2C address. Default 0x29.
      * Call Wire1.begin() before Bridge.begin() in the sketch.
      */
-    hybx_vl53l5cx(uint8_t resolution = 64,
+    hybx_vl53l5cx_unoq(uint8_t resolution = 64,
                   uint8_t address    = 0x29);
 
     /*
